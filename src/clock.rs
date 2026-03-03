@@ -77,7 +77,7 @@ pub mod simulator {
         pub fn node_id(&self) -> NodeId {
             self.cfg.node_id
         }
-
+        
         pub fn get_time(&self) -> i64 {
             let now = Instant::now();
             let true_time = self.compute_true_time(now);
@@ -98,8 +98,41 @@ pub mod simulator {
             clamped
         }
 
+        pub fn get_time_with_uncertainty(&self) -> (i64, i64) {
+            let now = Instant::now();
+            let true_time = self.compute_true_time(now);
+            let mut state = self.state.lock().unwrap();
+
+            // Resync if needed.
+            if true_time >= state.next_resync_sim_us {
+                self.resync(now, true_time, &mut state);
+            }
+
+            let sim_time = self.compute_sim_time(now, state.base_sim_offset_us);
+            let (min_allowed, max_allowed) = self.allowed_range(true_time);
+            let clamped =
+                self.clamp_sim_time(sim_time, min_allowed, max_allowed, &mut state);
+            state.last_sim_us = clamped;
+            state.last_true_time = true_time;
+            state.last_sim_time = clamped;
+
+            let error_abs = abs_i64(state.last_sim_time - state.last_true_time);
+            let upper = self.cfg.sync_uncertainty_us.max(error_abs);
+            let unc = if upper == 0 || upper == error_abs {
+                upper
+            } else {
+                state.rng.gen_range(error_abs..=upper)
+            };
+            (clamped, unc)
+        }
+
         pub fn get_true_time(&self) -> i64 {
             self.compute_true_time(Instant::now())
+        }
+
+        pub fn get_last_true_time(&self) -> i64 {
+            let state = self.state.lock().unwrap();
+            state.last_true_time
         }
 
         pub fn get_uncertainty(&self) -> i64 {
@@ -111,7 +144,7 @@ pub mod simulator {
             }
             state.rng.gen_range(error_abs..=upper)
         }
-
+        
         /// Starts a background thread that resyncs at the configured interval.
         /// The thread runs indefinitely; manage its lifetime externally if needed.
         pub fn start_auto_resync(clock: Arc<Clock>) -> JoinHandle<()> {
@@ -198,7 +231,7 @@ pub mod simulator {
             let (min_allowed, max_allowed) = self.allowed_range(true_time);
             let sim_time = self.compute_sim_time(now, state.base_sim_offset_us);
             let sim_time_no_offset = sim_time.saturating_sub(state.base_sim_offset_us);
-            let bound = self.cfg.sync_uncertainty_us.max(0);
+            // let bound = self.cfg.sync_uncertainty_us.max(0);
             // let new_error = if bound == 0 {
             //     0
             // } else {
@@ -267,5 +300,9 @@ impl omnipaxos::util::PhysicalClock for simulator::Clock {
 
     fn get_uncertainty(&self) -> i64 {
         simulator::Clock::get_uncertainty(self)
+    }
+
+    fn get_time_with_uncertainty(&self) -> (i64, i64) {
+        simulator::Clock::get_time_with_uncertainty(self)
     }
 }

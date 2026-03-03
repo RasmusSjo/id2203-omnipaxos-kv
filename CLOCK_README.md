@@ -1,5 +1,7 @@
 # Clock Simulator (Summary)
 
+## IMPORTANT: Currently, I divide the get_time() and get_uncertainty() into two separate methods, but they are designed to be called together. If two concurrent calls to get_time() and get_uncertainty() are made, the uncertainty may not align with the time. To address this, I added get_time_with_uncertainty() which returns both together atomically. 
+
 ## How the clock is simulated
 - **True time** is derived from one of the following:
   - `SystemTime::now()` minus a shared `start_unix_ms` (if configured), or
@@ -19,6 +21,7 @@
 - The clock implements `PhysicalClock` directly.
 - `get_time()` and `get_uncertainty()` are **`&self`** methods.
 - `get_uncertainty()` is aligned with the **most recent `get_time()`** result.
+- If you need an atomic pair, use `get_time_with_uncertainty()`.
 
 ## Per-server clock
 - Each server process initializes **one clock instance**.

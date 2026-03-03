@@ -13,21 +13,18 @@ fn main() {
         sync_period_us: 10_000,
         time_scale: 1,
         seed: Some(42),
+        start_unix_ms: Some(0),
     });
 
     // Warm-up
     for _ in 0..10_000 {
-        let _sim = clock.get_time();
-        let _true_t = clock.get_true_time();
-        let unc = clock.get_uncertainty();
+        let (_sim, unc) = clock.get_time_with_uncertainty();
         black_box(unc);
     }
 
     let start = Instant::now();
     for _ in 0..iters {
-        let _sim = clock.get_time();
-        let _true_t = clock.get_true_time();
-        let unc = clock.get_uncertainty();
+        let (_sim, unc) = clock.get_time_with_uncertainty();
         black_box(unc);
     }
     let elapsed = start.elapsed();

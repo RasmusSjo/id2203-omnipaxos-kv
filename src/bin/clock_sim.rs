@@ -46,6 +46,7 @@ fn main() {
             sync_period_us,
             time_scale,
             seed: Some(10_000 + i as u64),
+            start_unix_ms: Some(0),
         }));
         let handle = Clock::start_auto_resync(clock.clone());
         clocks.push(clock);
@@ -64,10 +65,9 @@ fn main() {
         let real_us = now.duration_since(start).as_micros() as i64;
         let real_ms = real_us as f64 / 1000.0;
         for clock in &clocks {
-            let sim_us = clock.get_time();
-            let true_us = clock.get_true_time();
+            let (sim_us, unc) = clock.get_time_with_uncertainty();
+            let true_us = clock.get_last_true_time();
             let error_us = sim_us - true_us;
-            let unc = clock.get_uncertainty();
             writeln!(
                 w,
                 "{},{:.3},{},{},{},{},{}",
