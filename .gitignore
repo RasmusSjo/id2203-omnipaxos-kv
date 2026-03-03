@@ -1,5 +1,7 @@
 # PROJECT-SPECIFIC IGNORES
 logs/
+scripts/clock_sim.csv
+scripts/clock_sim.png
 
 # GENERATED IGNORES
 # Created by https://www.toptal.com/developers/gitignore/api/rust

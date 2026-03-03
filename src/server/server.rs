@@ -6,14 +6,17 @@ use omnipaxos::{
     util::{LogEntry, NodeId},
     OmniPaxos, OmniPaxosConfig,
 };
+use omnipaxos_kv::clock::simulator::Clock;
 use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
-use std::{fs::File, io::Write, time::Duration};
+use std::{fs::File, io::Write, sync::OnceLock, time::Duration};
 
-type OmniPaxosInstance = OmniPaxos<Command, MemoryStorage<Command>>;
+type OmniPaxosInstance = OmniPaxos<'static, Command, MemoryStorage<Command>, Clock>;
 const NETWORK_BATCH_SIZE: usize = 100;
 const LEADER_WAIT: Duration = Duration::from_secs(1);
 const ELECTION_TIMEOUT: Duration = Duration::from_secs(1);
+
+static CLOCK: OnceLock<Clock> = OnceLock::new();
 
 pub struct OmniPaxosServer {
     id: NodeId,
@@ -32,7 +35,12 @@ impl OmniPaxosServer {
         let storage: MemoryStorage<Command> = MemoryStorage::default();
         let omnipaxos_config: OmniPaxosConfig = config.clone().into();
         let omnipaxos_msg_buffer = Vec::with_capacity(omnipaxos_config.server_config.buffer_size);
-        let omnipaxos = omnipaxos_config.build(storage).unwrap();
+        let clock = CLOCK.get_or_init(|| {
+            let mut clock_cfg = config.local.clock.clone();
+            clock_cfg.node_id = config.local.server_id;
+            Clock::new(clock_cfg)
+        });
+        let omnipaxos = omnipaxos_config.build(storage, clock).unwrap();
         // Waits for client and server network connections to be established
         let network = Network::new(config.clone(), NETWORK_BATCH_SIZE).await;
         OmniPaxosServer {

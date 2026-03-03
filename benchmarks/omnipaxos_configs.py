@@ -96,6 +96,7 @@ class ServerConfig:
         listen_port: int
         num_clients: int
         output_filepath: str
+        clock: ClockConfig
 
     def __post_init__(self):
         self.validate()
@@ -182,3 +183,13 @@ class RequestInterval:
     duration_sec: int
     requests_per_sec: int
     read_ratio: float
+
+
+@dataclass(frozen=True)
+class ClockConfig:
+    drift_rate_us_per_sec: int = 0
+    sync_uncertainty_us: int = 100
+    sync_period_us: int = 10000
+    time_scale: int = 1
+    seed: int | None = 42
+    start_unix_ms: int | None = 0

@@ -240,6 +240,7 @@ class OmnipaxosClusterBuilder:
                 listen_port=self._server_port,
                 num_clients=0,
                 output_filepath=f"server-{server_id}.json",
+                clock=ClockConfig(),
             ),
             rust_log=rust_log,
         )

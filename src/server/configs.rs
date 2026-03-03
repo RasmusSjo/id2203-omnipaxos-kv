@@ -6,6 +6,7 @@ use omnipaxos::{
     ClusterConfig as OmnipaxosClusterConfig, OmniPaxosConfig,
     ServerConfig as OmnipaxosServerConfig,
 };
+use omnipaxos_kv::clock::simulator::ClockConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,6 +25,8 @@ pub struct LocalConfig {
     pub listen_port: u16,
     pub num_clients: usize,
     pub output_filepath: String,
+    #[serde(default)]
+    pub clock: ClockConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
