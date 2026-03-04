@@ -190,6 +190,4 @@ class ClockConfig:
     drift_rate_us_per_sec: int = 0
     sync_uncertainty_us: int = 100
     sync_period_us: int = 10000
-    time_scale: int = 1
     seed: int | None = 42
-    start_unix_ms: int | None = 0

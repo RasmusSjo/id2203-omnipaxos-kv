@@ -1,6 +1,6 @@
 // This is a simple clock simulator that simulates multiple clocks with different drift rates and synchronization behavior. It periodically samples the simulated time and writes it to a CSV file for analysis.
 // Usage:
-// cargo run --bin clock_sim -- <out_csv> <duration_ms> <sample_ms> <sync_period_us> <uncertainty_us> <time_scale> <drift_list>
+// cargo run --bin clock_sim -- <out_csv> <duration_ms> <sample_ms> <sync_period_us> <uncertainty_us> <drift_list>
 // Visualization:
 // You can visualize the output CSV using python code in /scripts/plot_clock_sim.py
 // python scripts/plot_clock_sim.py <out_csv>
@@ -22,8 +22,7 @@ fn main() {
     let sample_ms: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(20);
     let sync_period_us: i64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(100_000);
     let uncertainty_us: i64 = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(50);
-    let time_scale: i64 = args.get(6).and_then(|s| s.parse().ok()).unwrap_or(1);
-    let drift_list = args.get(7).map(|s| s.as_str()).unwrap_or("-100,0,100,250");
+    let drift_list = args.get(6).map(|s| s.as_str()).unwrap_or("-100,0,100,250");
 
     let drift_rates: Vec<i64> = drift_list
         .split(',')
@@ -36,7 +35,6 @@ fn main() {
     }
 
     let mut clocks: Vec<Arc<Clock>> = Vec::new();
-    let mut _threads = Vec::new();
 
     for (i, drift) in drift_rates.iter().enumerate() {
         let clock = Arc::new(Clock::new(ClockConfig {
@@ -44,13 +42,9 @@ fn main() {
             drift_rate_us_per_sec: *drift,
             sync_uncertainty_us: uncertainty_us,
             sync_period_us,
-            time_scale,
             seed: Some(10_000 + i as u64),
-            start_unix_ms: Some(0),
         }));
-        let handle = Clock::start_auto_resync(clock.clone());
         clocks.push(clock);
-        _threads.push(handle);
     }
 
     let file = File::create(out_csv).expect("failed to create csv");

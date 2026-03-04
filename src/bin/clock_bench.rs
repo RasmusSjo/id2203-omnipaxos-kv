@@ -11,9 +11,7 @@ fn main() {
         drift_rate_us_per_sec: 100,
         sync_uncertainty_us: 100,
         sync_period_us: 10_000,
-        time_scale: 1,
         seed: Some(42),
-        start_unix_ms: Some(0),
     });
 
     // Warm-up

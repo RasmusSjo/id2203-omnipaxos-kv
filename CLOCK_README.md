@@ -3,10 +3,9 @@
 ## IMPORTANT: Currently, I divide the get_time() and get_uncertainty() into two separate methods, but they are designed to be called together. If two concurrent calls to get_time() and get_uncertainty() are made, the uncertainty may not align with the time. To address this, I added get_time_with_uncertainty() which returns both together atomically. 
 
 ## How the clock is simulated
-- **True time** is derived from one of the following:
-  - `SystemTime::now()` minus a shared `start_unix_ms` (if configured), or
-  - `Instant::now()` relative to the process start (default).
-- The true time is then scaled by `time_scale` to produce simulated microseconds.
+- **True time** is derived from a **SystemTime epoch at startup** plus **Instant-based elapsed time**.
+- This keeps true time monotonic and aligned across servers as long as `SystemTime` is synchronized.
+- The true time is expressed in simulated microseconds (no scaling).
 - **Drift** is applied as `drift_rate_us_per_sec` over simulated elapsed time.
 - The **simulated clock time** is:
   - `true_time + drift + offset`
@@ -36,7 +35,5 @@ Clock parameters live under the `[clock]` section in the server config TOML:
 drift_rate_us_per_sec = 0
 sync_uncertainty_us = 100
 sync_period_us = 10000
-time_scale = 1
 seed = 42
-start_unix_ms = 0
 ```

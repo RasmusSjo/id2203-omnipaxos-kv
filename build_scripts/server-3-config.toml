@@ -6,9 +6,7 @@ listen_port = 8003
 output_filepath = "./logs/server-3.json"
 
 [clock]
-drift_rate_us_per_sec = 0
+drift_rate_us_per_sec = -500
 sync_uncertainty_us = 100
 sync_period_us = 10000
-time_scale = 1
 seed = 42
-start_unix_ms = 0
