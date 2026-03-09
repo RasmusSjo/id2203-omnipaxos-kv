@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Wait for startup script to complete
+while [ ! -f /home/$USER/.startup_complete ]; do sleep 2; done
+
 # Function to clean up any running server container
 cleanup() {
     docker kill server > /dev/null 2>&1

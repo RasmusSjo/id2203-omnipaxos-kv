@@ -5,3 +5,12 @@
 !src/
 !Cargo.toml
 !Cargo.lock
+
+
+!id2203-omnipaxos-kv/src/
+!id2203-omnipaxos-kv/Cargo.toml
+!id2203-omnipaxos-kv/Cargo.lock
+!id2203-omnipaxos/omnipaxos/src/
+!id2203-omnipaxos/omnipaxos/Cargo.toml
+!id2203-omnipaxos/omnipaxos_storage/src/
+!id2203-omnipaxos/omnipaxos_storage/Cargo.toml

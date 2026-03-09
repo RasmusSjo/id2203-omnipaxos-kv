@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from omnipaxos_cluster import OmnipaxosClusterBuilder
-from omnipaxos_configs import FlexibleQuorum, RequestInterval
+#from omnipaxos_configs import FlexibleQuorum, RequestInterval
+from omnipaxos_configs import ClockConfig, FlexibleQuorum, RequestInterval
 
 
 def example_workload() -> dict[int, list[RequestInterval]]:
@@ -29,14 +30,14 @@ def example_benchmark(num_runs: int = 3):
         OmnipaxosClusterBuilder(1)
         .initial_leader(5)
         .server(1, "us-west2-a")
-        .server(2, "us-south1-a")
+        .server(2, "us-east4-b")
         .server(3, "us-east4-a")
-        .server(4, "europe-southwest1-a")
+        .server(4, "europe-west1-b")
         .server(5, "europe-west4-a")
         .client(1, "us-west2-a", requests=workload[1])
-        .client(2, "us-south1-a", requests=workload[2])
+        .client(2, "us-east4-b", requests=workload[2])
         .client(3, "us-east4-a", requests=workload[3])
-        .client(4, "europe-southwest1-a", requests=workload[4])
+        .client(4, "europe-west1-b", requests=workload[4])
         .client(5, "europe-west4-a", requests=workload[5])
     ).build()
     experiment_log_dir = Path(f"./logs/example-experiment")
@@ -60,10 +61,50 @@ def example_benchmark(num_runs: int = 3):
     # Shutdown GCP instances (or not if you want to reuse instances in another benchmark)
     cluster.shutdown()
 
+CLOCK_CONFIGS = {
+    "high":   dict(sync_uncertainty_us=10,   sync_period_us=1_000),
+    "medium": dict(sync_uncertainty_us=100,  sync_period_us=10_000),
+    "low":    dict(sync_uncertainty_us=1000, sync_period_us=100_000),
+}
+
+def clock_quality_benchmark(num_runs: int = 3):
+    workload = {node: [RequestInterval(20, 50, 0.5)] for node in [1, 2, 3, 4, 5]}
+    flex_quorum = FlexibleQuorum(read_quorum_size=4, write_quorum_size=2)
+
+    cluster = (
+        OmnipaxosClusterBuilder(2)
+        .initial_leader(5)
+        .server(1, "us-west2-a")
+        .server(2, "us-east4-b")
+        .server(3, "us-east4-a")
+        .server(4, "europe-west1-b")
+        .server(5, "europe-west4-a")
+        .client(1, "us-west2-a", requests=workload[1])
+        .client(2, "us-east4-b", requests=workload[2])
+        .client(3, "us-east4-a", requests=workload[3])
+        .client(4, "europe-west1-b", requests=workload[4])
+        .client(5, "europe-west4-a", requests=workload[5])
+    ).build()
+
+    cluster.change_cluster_config(initial_flexible_quorum=flex_quorum)
+    experiment_log_dir = Path("./logs/clock-benchmark-gcp")
+
+    for quality, clock_params in CLOCK_CONFIGS.items():
+        for server_id in [1, 2, 3, 4, 5]:
+            cluster.change_server_config(
+                server_id,
+                clock=ClockConfig(node_id=server_id, drift_rate_us_per_sec=0, seed=42, **clock_params),
+            )
+        for run in range(num_runs):
+            iteration_dir = experiment_log_dir / quality / f"run-{run}"
+            print("RUNNING:", iteration_dir)
+            cluster.run(iteration_dir)
+
+    cluster.shutdown()
 
 def main():
-    example_benchmark()
-    pass
+    clock_quality_benchmark()
+    #example_benchmark()
 
 
 if __name__ == "__main__":

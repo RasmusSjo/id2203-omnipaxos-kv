@@ -24,3 +24,9 @@ gcloud auth application-default login
 # gcloud-managed credentials, making it easier to push and pull images securely.
 gcloud auth configure-docker gcr.io
 
+export PROJECT_ID="project-56af87a2-00cd-4411-8d4"
+export SERVICE_ACCOUNT="deployment@project-56af87a2-00cd-4411-8d4.iam.gserviceaccount.com"
+export OSLOGIN_USERNAME="mnavarros123_gmail_com"
+export OSLOGIN_UID="38171414"
+export CLIENT_DOCKER_IMAGE_NAME="gcr.io/$PROJECT_ID/${OSLOGIN_UID}_omnipaxos_client"
+export SERVER_DOCKER_IMAGE_NAME="gcr.io/$PROJECT_ID/${OSLOGIN_UID}_omnipaxos_server"

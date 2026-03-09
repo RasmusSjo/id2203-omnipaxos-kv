@@ -1,0 +1,13 @@
+location = "local-2"
+server_id = 2
+num_clients = 1
+listen_address = "127.0.0.1"
+listen_port = 8002
+output_filepath = "./logs/clock-benchmark/low/server-2.json"
+
+[clock]
+node_id = 2
+drift_rate_us_per_sec = -2000
+sync_uncertainty_us = 1000
+sync_period_us = 100000
+seed = 42

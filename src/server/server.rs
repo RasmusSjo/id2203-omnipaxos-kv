@@ -65,11 +65,15 @@ impl OmniPaxosServer {
             .await;
         // Main event loop with leader election
         let mut election_interval = tokio::time::interval(ELECTION_TIMEOUT);
+        let mut stats_interval = tokio::time::interval(Duration::from_secs(5));
         loop {
             tokio::select! {
                 _ = election_interval.tick() => {
                     self.omnipaxos.tick();
                     self.send_outgoing_msgs();
+                },
+                _ = stats_interval.tick() => {
+                    self.save_output().expect("Failed to write stats");
                 },
                 _ = self.network.cluster_messages.recv_many(&mut cluster_msg_buf, NETWORK_BATCH_SIZE) => {
                     self.handle_cluster_messages(&mut cluster_msg_buf).await;
@@ -227,9 +231,27 @@ impl OmniPaxosServer {
     }
 
     fn save_output(&mut self) -> Result<(), std::io::Error> {
-        let config_json = serde_json::to_string_pretty(&self.config)?;
+        let (fast, slow) = self.omnipaxos.get_fast_path_ratio();
+        let total = fast + slow;
+        let fast_path_ratio = if total > 0 {
+            fast as f64 / total as f64
+        } else {
+            0.0
+        };
+        let output = serde_json::json!({
+            "config": &self.config,
+            "fast_path_decisions": fast,
+            "slow_path_decisions": slow,
+            "fast_path_ratio": fast_path_ratio,
+        });
+        //let config_json = serde_json::to_string_pretty(&self.config)?;
+        //let mut output_file = File::create(&self.config.local.output_filepath)?;
+        //output_file.write_all(config_json.as_bytes())?;
+        //output_file.flush()?;
+        //Ok(())
+        let output_json = serde_json::to_string_pretty(&output)?;
         let mut output_file = File::create(&self.config.local.output_filepath)?;
-        output_file.write_all(config_json.as_bytes())?;
+        output_file.write_all(output_json.as_bytes())?;
         output_file.flush()?;
         Ok(())
     }
