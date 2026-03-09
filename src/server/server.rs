@@ -10,6 +10,7 @@ use omnipaxos_kv::clock::simulator::Clock;
 use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use std::{fs::File, io::Write, sync::OnceLock, time::Duration};
+use omnipaxos::messages::sequence_paxos::EntryId;
 
 type OmniPaxosInstance = OmniPaxos<'static, Command, MemoryStorage<Command>, Clock>;
 const NETWORK_BATCH_SIZE: usize = 100;
@@ -210,7 +211,8 @@ impl OmniPaxosServer {
             kv_cmd: kv_command,
         };
         self.omnipaxos
-            .append(command)
+            //.append(command)
+            .append_with_id(command, EntryId {client_id: from, command_id})
             .expect("Append to Omnipaxos log failed");
     }
 
