@@ -13,7 +13,7 @@ tokio = { version = "1.35.1", features = ["full"] }
 tokio-serde = { version = "0.8.0", features = ["bincode"] }
 tokio-util = { version = "0.7.10", features = ["codec"] }
 # omnipaxos = { git = "https://github.com/RasmusSjo/id2203-omnipaxos.git", features = ["serde", "toml_config"] }
-omnipaxos = { path = "../id2203-omnipaxos/omnipaxos", features = ["serde", "toml_config"] }
+omnipaxos = { path = "../id2203-omnipaxos/omnipaxos", features = ["serde", "toml_config", "logging", "benchmark"] }
 # omnipaxos_storage = { git = "https://github.com/RasmusSjo/id2203-omnipaxos.git" }
 omnipaxos_storage = { path = "../id2203-omnipaxos/omnipaxos_storage"}
 chrono = "0.4.34"
