@@ -1,0 +1,13 @@
+location = "local-5"
+server_id = 5
+num_clients = 0 # Hardcoded number of client connections to wait for
+listen_address = "127.0.0.1"
+listen_port = 8005
+output_filepath = "./logs/server-5.json"
+
+[clock]
+node_id = 5
+drift_rate_us_per_sec = 100
+sync_uncertainty_us = 100
+sync_period_us = 10000
+seed = 42

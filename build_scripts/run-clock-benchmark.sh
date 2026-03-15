@@ -46,12 +46,12 @@ output_filepath = "$log_dir/client-1.csv"
 
 [[requests]]
 duration_sec = 20
-requests_per_sec = 50
+requests_per_sec = 10000
 read_ratio = 0.5
 TOML
 
     # Write server configs with correct output paths
-    for i in 1 2 3; do
+    for i in 1 2 3 4 5; do
         local src="$SCRIPT_DIR/$quality/server-$i-config.toml"
         local dst="$log_dir/server-$i-config.toml"
         sed "s|output_filepath = .*|output_filepath = \"$log_dir/server-$i.json\"|" "$src" > "$dst"
@@ -59,7 +59,7 @@ TOML
 
     # Start servers
     local server_pids=()
-    for i in 1 2 3; do
+    for i in 1 2 3 4 5; do
         RUST_LOG=$RUST_LOG \
         SERVER_CONFIG_FILE="$log_dir/server-$i-config.toml" \
         CLUSTER_CONFIG_FILE="$CLUSTER_CONFIG" \
@@ -78,7 +78,10 @@ TOML
     cargo run --manifest-path="$SCRIPT_DIR/../Cargo.toml" --release --bin client \
         2> "$log_dir/client-1-stderr.log"
 
-    echo "Client finished. Stopping servers..."
+    echo "Client finished. Waiting 5 seconds for final server stats snapshot..."
+    sleep 5
+
+    echo "Stopping servers..."
 
     # Kill servers
     for pid in "${server_pids[@]}"; do
