@@ -67,6 +67,7 @@ impl OmniPaxosServer {
         // Main event loop with leader election
         let mut election_interval = tokio::time::interval(ELECTION_TIMEOUT);
         let mut stats_interval = tokio::time::interval(Duration::from_secs(5));
+        let mut poll_timeout = tokio::time::interval(Duration::from_millis(1));
         loop {
             tokio::select! {
                 _ = election_interval.tick() => {
@@ -76,6 +77,10 @@ impl OmniPaxosServer {
                 _ = stats_interval.tick() => {
                     self.save_output().expect("Failed to write stats");
                 },
+                _ = poll_timeout.tick() => {
+                    self.omnipaxos.poll();
+                    self.send_outgoing_msgs();
+                }
                 _ = self.network.cluster_messages.recv_many(&mut cluster_msg_buf, NETWORK_BATCH_SIZE) => {
                     self.handle_cluster_messages(&mut cluster_msg_buf).await;
                 },
