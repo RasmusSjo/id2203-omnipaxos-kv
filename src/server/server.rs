@@ -1,6 +1,7 @@
 use crate::{configs::OmniPaxosKVConfig, database::Database, network::Network};
 use chrono::Utc;
 use log::*;
+use omnipaxos::messages::sequence_paxos::EntryId;
 use omnipaxos::{
     messages::Message,
     util::{LogEntry, NodeId},
@@ -9,8 +10,8 @@ use omnipaxos::{
 use omnipaxos_kv::clock::simulator::Clock;
 use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
+use serde::Serialize;
 use std::{fs::File, io::Write, sync::OnceLock, time::Duration};
-use omnipaxos::messages::sequence_paxos::EntryId;
 
 type OmniPaxosInstance = OmniPaxos<'static, Command, MemoryStorage<Command>, Clock>;
 const NETWORK_BATCH_SIZE: usize = 100;
@@ -18,6 +19,32 @@ const LEADER_WAIT: Duration = Duration::from_secs(1);
 const ELECTION_TIMEOUT: Duration = Duration::from_secs(1);
 
 static CLOCK: OnceLock<Clock> = OnceLock::new();
+
+#[derive(Serialize)]
+struct DomOwdOutput {
+    incoming_estimates: std::collections::HashMap<NodeId, i64>,
+    outgoing_estimates: std::collections::HashMap<NodeId, i64>,
+    max_outgoing_estimate: i64,
+}
+
+#[derive(Serialize)]
+struct DomOwdHistoryPoint {
+    timestamp_ms: Timestamp,
+    dom_owd: DomOwdOutput,
+}
+
+#[derive(Serialize)]
+struct DecisionStatsOutput {
+    fast_path_decisions: u64,
+    slow_path_decisions: u64,
+    fast_path_ratio: f64,
+}
+
+#[derive(Serialize)]
+struct DecisionStatsHistoryPoint {
+    timestamp_ms: Timestamp,
+    decision_stats: DecisionStatsOutput,
+}
 
 pub struct OmniPaxosServer {
     id: NodeId,
@@ -28,6 +55,8 @@ pub struct OmniPaxosServer {
     omnipaxos_msg_buffer: Vec<Message<Command>>,
     config: OmniPaxosKVConfig,
     peers: Vec<NodeId>,
+    dom_owd_history: Vec<DomOwdHistoryPoint>,
+    decision_stats_history: Vec<DecisionStatsHistoryPoint>,
 }
 
 impl OmniPaxosServer {
@@ -53,6 +82,8 @@ impl OmniPaxosServer {
             omnipaxos_msg_buffer,
             peers: config.get_peers(config.local.server_id),
             config,
+            dom_owd_history: Vec::with_capacity(16),
+            decision_stats_history: Vec::with_capacity(16),
         }
     }
 
@@ -212,7 +243,13 @@ impl OmniPaxosServer {
         };
         self.omnipaxos
             //.append(command)
-            .append_with_id(command, EntryId {client_id: from, command_id})
+            .append_with_id(
+                command,
+                EntryId {
+                    client_id: from,
+                    command_id,
+                },
+            )
             .expect("Append to Omnipaxos log failed");
     }
 
@@ -234,17 +271,47 @@ impl OmniPaxosServer {
 
     fn save_output(&mut self) -> Result<(), std::io::Error> {
         let (fast, slow) = self.omnipaxos.get_fast_path_ratio();
+        let owd_snapshot = self.omnipaxos.get_dom_owd_snapshot();
+        let dom_owd = DomOwdOutput {
+            incoming_estimates: owd_snapshot.incoming_estimates,
+            outgoing_estimates: owd_snapshot.outgoing_estimates,
+            max_outgoing_estimate: owd_snapshot.max_outgoing_estimate,
+        };
+        self.dom_owd_history.push(DomOwdHistoryPoint {
+            timestamp_ms: Utc::now().timestamp_millis(),
+            dom_owd: DomOwdOutput {
+                incoming_estimates: dom_owd.incoming_estimates.clone(),
+                outgoing_estimates: dom_owd.outgoing_estimates.clone(),
+                max_outgoing_estimate: dom_owd.max_outgoing_estimate,
+            },
+        });
         let total = fast + slow;
         let fast_path_ratio = if total > 0 {
             fast as f64 / total as f64
         } else {
             0.0
         };
+        let decision_stats = DecisionStatsOutput {
+            fast_path_decisions: fast,
+            slow_path_decisions: slow,
+            fast_path_ratio,
+        };
+        self.decision_stats_history.push(DecisionStatsHistoryPoint {
+            timestamp_ms: Utc::now().timestamp_millis(),
+            decision_stats: DecisionStatsOutput {
+                fast_path_decisions: decision_stats.fast_path_decisions,
+                slow_path_decisions: decision_stats.slow_path_decisions,
+                fast_path_ratio: decision_stats.fast_path_ratio,
+            },
+        });
         let output = serde_json::json!({
             "config": &self.config,
-            "fast_path_decisions": fast,
-            "slow_path_decisions": slow,
-            "fast_path_ratio": fast_path_ratio,
+            "fast_path_decisions": decision_stats.fast_path_decisions,
+            "slow_path_decisions": decision_stats.slow_path_decisions,
+            "fast_path_ratio": decision_stats.fast_path_ratio,
+            "decision_stats_history": &self.decision_stats_history,
+            "dom_owd": &dom_owd,
+            "dom_owd_history": &self.dom_owd_history,
         });
         //let config_json = serde_json::to_string_pretty(&self.config)?;
         //let mut output_file = File::create(&self.config.local.output_filepath)?;
