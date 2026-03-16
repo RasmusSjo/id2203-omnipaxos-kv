@@ -96,6 +96,7 @@ class ServerConfig:
         listen_port: int
         num_clients: int
         output_filepath: str
+        owd_config: OwdEstimatorConfig
         clock: ClockConfig
 
     def __post_init__(self):
@@ -192,3 +193,17 @@ class ClockConfig:
     sync_uncertainty_us: int = 100
     sync_period_us: int = 10000
     seed: int | None = 42
+
+
+@dataclass(frozen=True)
+class EstimatorStrategy:
+    type: str = "percentile"
+    percentile: float | None = 0.5
+
+
+@dataclass(frozen=True)
+class OwdEstimatorConfig:
+    window_size: int = 10
+    max_owd: int = 10000
+    uncertainty_beta: int = 3
+    strategy: EstimatorStrategy = EstimatorStrategy()
