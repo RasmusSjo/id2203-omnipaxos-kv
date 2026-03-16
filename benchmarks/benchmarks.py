@@ -69,7 +69,7 @@ CLOCK_CONFIGS = {
 
 def clock_quality_benchmark(num_runs: int = 3):
     workload = {node: [RequestInterval(20, 50, 0.5)] for node in [1, 2, 3, 4, 5]}
-    flex_quorum = FlexibleQuorum(read_quorum_size=4, write_quorum_size=2)
+    flex_quorum = FlexibleQuorum(read_quorum_size=3, write_quorum_size=3)
 
     cluster = (
         OmnipaxosClusterBuilder(2)
