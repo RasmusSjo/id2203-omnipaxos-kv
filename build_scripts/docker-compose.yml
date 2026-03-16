@@ -13,8 +13,8 @@ services:
   s1:
     image: omnipaxos-server
     build:
-      context: ./..
-      dockerfile: server.dockerfile
+      context: ./../..
+      dockerfile: id2203-omnipaxos-kv/server.dockerfile
     container_name: s1
     environment:
       <<: *common-server-variables
@@ -43,8 +43,8 @@ services:
   c1:
     image: omnipaxos-client
     build:
-      context: ./..
-      dockerfile: client.dockerfile
+      context: ./../..
+      dockerfile: id2203-omnipaxos-kv/client.dockerfile
     container_name: c1
     environment:
       RUST_LOG: "debug"

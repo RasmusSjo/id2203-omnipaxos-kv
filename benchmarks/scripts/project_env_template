@@ -1,6 +1,9 @@
 #!/bin/bash
 # COPY THIS FILE INTO ./project_env.sh BEFORE CONFIGURING ENVIRONMENT VARIABLES!
-export PROJECT_ID="my-project-1499979282244" # Harald's project id
+#export PROJECT_ID="my-project-1499979282244" # Harald's project id
+#export SERVICE_ACCOUNT="deployment@$PROJECT_ID.iam.gserviceaccount.com" # Service account attached to GCP instances
+
+export PROJECT_ID="project-56af87a2-00cd-4411-8d4" # Harald's project id
 export SERVICE_ACCOUNT="deployment@$PROJECT_ID.iam.gserviceaccount.com" # Service account attached to GCP instances
 
 # Running `gcloud compute os-login describe-profile` should result in YAML data

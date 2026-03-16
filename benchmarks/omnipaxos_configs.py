@@ -187,6 +187,7 @@ class RequestInterval:
 
 @dataclass(frozen=True)
 class ClockConfig:
+    node_id: int = 0
     drift_rate_us_per_sec: int = 0
     sync_uncertainty_us: int = 100
     sync_period_us: int = 10000

@@ -2,6 +2,7 @@ use std::env;
 
 use config::{Config, ConfigError, Environment, File};
 use omnipaxos::{
+    dom::OwdEstimatorConfig,
     util::{FlexibleQuorum, NodeId},
     ClusterConfig as OmnipaxosClusterConfig, OmniPaxosConfig,
     ServerConfig as OmnipaxosServerConfig,
@@ -26,6 +27,8 @@ pub struct LocalConfig {
     pub num_clients: usize,
     pub output_filepath: String,
     #[serde(default)]
+    pub owd_config: OwdEstimatorConfig,
+    #[serde(default)]
     pub clock: ClockConfig,
 }
 
@@ -46,6 +49,7 @@ impl Into<OmniPaxosConfig> for OmniPaxosKVConfig {
         };
         let server_config = OmnipaxosServerConfig {
             pid: self.local.server_id,
+            owd_config: self.local.owd_config,
             ..Default::default()
         };
         OmniPaxosConfig {

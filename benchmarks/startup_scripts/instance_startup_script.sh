@@ -11,6 +11,12 @@ useradd -m $OSLOGIN_USER
 mkdir -p /home/$OSLOGIN_USER
 chown $OSLOGIN_USER:$OSLOGIN_USER /home/$OSLOGIN_USER
 
+# Install docker-credential-gcr
+curl -fsSL https://github.com/GoogleCloudPlatform/docker-credential-gcr/releases/download/v2.1.22/docker-credential-gcr_linux_amd64-2.1.22.tar.gz \
+    | tar xz --to-stdout docker-credential-gcr \
+    > /usr/local/bin/docker-credential-gcr
+chmod +x /usr/local/bin/docker-credential-gcr
+
 # Configure Docker credentials for the user
 sudo -u $OSLOGIN_USER docker-credential-gcr configure-docker --registries=gcr.io
 sudo -u $OSLOGIN_USER echo "https://gcr.io" | docker-credential-gcr get
@@ -21,5 +27,8 @@ sudo usermod -aG docker $OSLOGIN_USER
 sudo -u $OSLOGIN_USER docker pull $DOCKER_IMAGE
 
 # Fetch the run_container.sh script from instance metadata
-curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/run_container_script" -o home/$OSLOGIN_USER/run_container.sh
+curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/run_container_script" -o /home/$OSLOGIN_USER/run_container.sh
 chmod +x /home/$OSLOGIN_USER/run_container.sh
+
+# Signal that startup is complete
+touch /home/$OSLOGIN_USER/.startup_complete

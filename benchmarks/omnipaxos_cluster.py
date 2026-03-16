@@ -210,7 +210,7 @@ class OmnipaxosClusterBuilder:
         self,
         server_id: int,
         zone: str,
-        machine_type: str = "e2-standard-8",
+        machine_type: str = "e2-standard-4",
         rust_log: str = "info",
     ):
         if server_id in self._server_configs.keys():
@@ -240,7 +240,7 @@ class OmnipaxosClusterBuilder:
                 listen_port=self._server_port,
                 num_clients=0,
                 output_filepath=f"server-{server_id}.json",
-                clock=ClockConfig(),
+                clock=ClockConfig(node_id=server_id),
             ),
             rust_log=rust_log,
         )

@@ -1,4 +1,4 @@
-FROM rust:1.84 AS chef
+FROM rust:1.86 AS chef
 
 # Stop if a command fails
 RUN set -eux
@@ -7,20 +7,25 @@ RUN set -eux
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
 # cargo-chef will be cached from the second build onwards
-RUN cargo install cargo-chef
-WORKDIR /app
+RUN cargo install cargo-chef --version 0.1.68 --locked
 
+WORKDIR /app
 FROM chef AS planner
-COPY . .
+COPY id2203-omnipaxos-kv/ ./
+COPY id2203-omnipaxos/ ../id2203-omnipaxos/
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
+COPY id2203-omnipaxos/ ../id2203-omnipaxos/
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
 
+
 # Build application
-COPY . .
+#COPY . .
+#RUN cargo build --release --bin server
+COPY id2203-omnipaxos-kv/ ./
 RUN cargo build --release --bin server
 
 FROM debian:bookworm-slim AS runtime
@@ -28,3 +33,5 @@ WORKDIR /app
 COPY --from=builder /app/target/release/server /usr/local/bin
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/server"]
+
+

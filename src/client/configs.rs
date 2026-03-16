@@ -50,8 +50,11 @@ impl RequestInterval {
         if self.requests_per_sec == 0 {
             return Duration::from_secs(999999);
         }
-        let delay_ms = 1000 / self.requests_per_sec;
-        assert!(delay_ms != 0);
-        Duration::from_millis(delay_ms)
+        // let delay_ms = 1000 / self.requests_per_sec;
+        // assert!(delay_ms != 0);
+        // Duration::from_millis(delay_ms)
+        let delay_us = 1_000_000 / self.requests_per_sec;
+        assert!(delay_us != 0);
+        Duration::from_micros(delay_us)
     }
 }
