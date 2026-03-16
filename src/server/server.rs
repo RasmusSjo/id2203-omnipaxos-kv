@@ -11,16 +11,24 @@ use omnipaxos_kv::clock::simulator::Clock;
 use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use serde::Serialize;
-use std::{fs::File, io::Write, sync::OnceLock, time::Duration};
+use std::{
+    fs::{File, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+    time::Duration,
+};
 
 type OmniPaxosInstance = OmniPaxos<'static, Command, MemoryStorage<Command>, Clock>;
 const NETWORK_BATCH_SIZE: usize = 100;
 const LEADER_WAIT: Duration = Duration::from_secs(1);
 const ELECTION_TIMEOUT: Duration = Duration::from_secs(1);
+const STATS_WRITE_INTERVAL: Duration = Duration::from_secs(5);
+const DOM_OWD_SAMPLE_INTERVAL: Duration = Duration::from_millis(500);
 
 static CLOCK: OnceLock<Clock> = OnceLock::new();
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct DomOwdOutput {
     incoming_estimates: std::collections::HashMap<NodeId, i64>,
     outgoing_estimates: std::collections::HashMap<NodeId, i64>,
@@ -28,12 +36,15 @@ struct DomOwdOutput {
 }
 
 #[derive(Serialize)]
-struct DomOwdHistoryPoint {
+struct DomOwdCsvRow {
     timestamp_ms: Timestamp,
-    dom_owd: DomOwdOutput,
+    server_id: NodeId,
+    metric: &'static str,
+    peer_id: Option<NodeId>,
+    owd_us: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct DecisionStatsOutput {
     fast_path_decisions: u64,
     slow_path_decisions: u64,
@@ -55,7 +66,6 @@ pub struct OmniPaxosServer {
     omnipaxos_msg_buffer: Vec<Message<Command>>,
     config: OmniPaxosKVConfig,
     peers: Vec<NodeId>,
-    dom_owd_history: Vec<DomOwdHistoryPoint>,
     decision_stats_history: Vec<DecisionStatsHistoryPoint>,
 }
 
@@ -82,13 +92,16 @@ impl OmniPaxosServer {
             omnipaxos_msg_buffer,
             peers: config.get_peers(config.local.server_id),
             config,
-            dom_owd_history: Vec::with_capacity(16),
             decision_stats_history: Vec::with_capacity(16),
         }
     }
 
     pub async fn run(&mut self) {
         // Save config to output file
+        self.init_dom_owd_csv().expect("Failed to initialise OWD CSV");
+        self.record_dom_owd_snapshot()
+            .expect("Failed to write initial OWD snapshot");
+        self.record_decision_stats_snapshot();
         self.save_output().expect("Failed to write to file");
         let mut client_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
         let mut cluster_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
@@ -97,7 +110,8 @@ impl OmniPaxosServer {
             .await;
         // Main event loop with leader election
         let mut election_interval = tokio::time::interval(ELECTION_TIMEOUT);
-        let mut stats_interval = tokio::time::interval(Duration::from_secs(5));
+        let mut stats_interval = tokio::time::interval(STATS_WRITE_INTERVAL);
+        let mut dom_owd_interval = tokio::time::interval(DOM_OWD_SAMPLE_INTERVAL);
         let mut poll_timeout = tokio::time::interval(Duration::from_millis(1));
         loop {
             tokio::select! {
@@ -105,7 +119,12 @@ impl OmniPaxosServer {
                     self.omnipaxos.tick();
                     self.send_outgoing_msgs();
                 },
+                _ = dom_owd_interval.tick() => {
+                    self.record_dom_owd_snapshot()
+                        .expect("Failed to write OWD snapshot");
+                },
                 _ = stats_interval.tick() => {
+                    self.record_decision_stats_snapshot();
                     self.save_output().expect("Failed to write stats");
                 },
                 _ = poll_timeout.tick() => {
@@ -274,49 +293,109 @@ impl OmniPaxosServer {
         }
     }
 
-    fn save_output(&mut self) -> Result<(), std::io::Error> {
-        let (fast, slow) = self.omnipaxos.get_fast_path_ratio();
+    fn current_dom_owd_output(&self) -> DomOwdOutput {
         let owd_snapshot = self.omnipaxos.get_dom_owd_snapshot();
-        let dom_owd = DomOwdOutput {
+        DomOwdOutput {
             incoming_estimates: owd_snapshot.incoming_estimates,
             outgoing_estimates: owd_snapshot.outgoing_estimates,
             max_outgoing_estimate: owd_snapshot.max_outgoing_estimate,
-        };
-        self.dom_owd_history.push(DomOwdHistoryPoint {
-            timestamp_ms: Utc::now().timestamp_millis(),
-            dom_owd: DomOwdOutput {
-                incoming_estimates: dom_owd.incoming_estimates.clone(),
-                outgoing_estimates: dom_owd.outgoing_estimates.clone(),
-                max_outgoing_estimate: dom_owd.max_outgoing_estimate,
-            },
-        });
+        }
+    }
+
+    fn current_decision_stats_output(&self) -> DecisionStatsOutput {
+        let (fast, slow) = self.omnipaxos.get_fast_path_ratio();
         let total = fast + slow;
         let fast_path_ratio = if total > 0 {
             fast as f64 / total as f64
         } else {
             0.0
         };
-        let decision_stats = DecisionStatsOutput {
+        DecisionStatsOutput {
             fast_path_decisions: fast,
             slow_path_decisions: slow,
             fast_path_ratio,
-        };
+        }
+    }
+
+    fn dom_owd_csv_path(&self) -> PathBuf {
+        let output_path = Path::new(&self.config.local.output_filepath);
+        let stem = output_path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .expect("output filepath must have a valid stem");
+        output_path.with_file_name(format!("{stem}-owd.csv"))
+    }
+
+    fn init_dom_owd_csv(&self) -> Result<(), std::io::Error> {
+        let file = File::create(self.dom_owd_csv_path())?;
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(false)
+            .from_writer(file);
+        writer.write_record(["timestamp_ms", "server_id", "metric", "peer_id", "owd_us"])?;
+        writer.flush()?;
+        Ok(())
+    }
+
+    fn record_dom_owd_snapshot(&mut self) -> Result<(), std::io::Error> {
+        let dom_owd = self.current_dom_owd_output();
+        let timestamp_ms = Utc::now().timestamp_millis();
+        let file = OpenOptions::new().append(true).open(self.dom_owd_csv_path())?;
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(false)
+            .from_writer(file);
+
+        writer.serialize(DomOwdCsvRow {
+            timestamp_ms,
+            server_id: self.id,
+            metric: "max_outgoing",
+            peer_id: None,
+            owd_us: dom_owd.max_outgoing_estimate,
+        })?;
+
+        for (peer_id, owd_us) in &dom_owd.incoming_estimates {
+            writer.serialize(DomOwdCsvRow {
+                timestamp_ms,
+                server_id: self.id,
+                metric: "incoming",
+                peer_id: Some(*peer_id),
+                owd_us: *owd_us,
+            })?;
+        }
+
+        for (peer_id, owd_us) in &dom_owd.outgoing_estimates {
+            writer.serialize(DomOwdCsvRow {
+                timestamp_ms,
+                server_id: self.id,
+                metric: "outgoing",
+                peer_id: Some(*peer_id),
+                owd_us: *owd_us,
+            })?;
+        }
+
+        writer.flush()?;
+        Ok(())
+    }
+
+    fn record_decision_stats_snapshot(&mut self) {
+        let decision_stats = self.current_decision_stats_output();
         self.decision_stats_history.push(DecisionStatsHistoryPoint {
             timestamp_ms: Utc::now().timestamp_millis(),
-            decision_stats: DecisionStatsOutput {
-                fast_path_decisions: decision_stats.fast_path_decisions,
-                slow_path_decisions: decision_stats.slow_path_decisions,
-                fast_path_ratio: decision_stats.fast_path_ratio,
-            },
+            decision_stats,
         });
+    }
+
+    fn save_output(&mut self) -> Result<(), std::io::Error> {
+        let dom_owd = self.current_dom_owd_output();
+        let decision_stats = self.current_decision_stats_output();
         let output = serde_json::json!({
             "config": &self.config,
+            "owd_config": &self.config.local.owd_config,
+            "clock_config": &self.config.local.clock,
             "fast_path_decisions": decision_stats.fast_path_decisions,
             "slow_path_decisions": decision_stats.slow_path_decisions,
             "fast_path_ratio": decision_stats.fast_path_ratio,
             "decision_stats_history": &self.decision_stats_history,
             "dom_owd": &dom_owd,
-            "dom_owd_history": &self.dom_owd_history,
         });
         //let config_json = serde_json::to_string_pretty(&self.config)?;
         //let mut output_file = File::create(&self.config.local.output_filepath)?;
