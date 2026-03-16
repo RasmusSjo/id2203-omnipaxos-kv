@@ -2,7 +2,13 @@ from pathlib import Path
 
 from omnipaxos_cluster import OmnipaxosClusterBuilder
 #from omnipaxos_configs import FlexibleQuorum, RequestInterval
-from omnipaxos_configs import ClockConfig, FlexibleQuorum, RequestInterval
+from omnipaxos_configs import (
+    ClockConfig,
+    EstimatorStrategy,
+    FlexibleQuorum,
+    OwdEstimatorConfig,
+    RequestInterval,
+)
 
 
 def example_workload() -> dict[int, list[RequestInterval]]:
@@ -67,6 +73,33 @@ CLOCK_CONFIGS = {
     "low":    dict(sync_uncertainty_us=1000, sync_period_us=100_000),
 }
 
+OWD_CONFIGS = {
+    "fixed": OwdEstimatorConfig(
+        window_size=50,
+        max_owd=50_000, #50ms
+        uncertainty_beta=3,
+        strategy=EstimatorStrategy(type="fixed"),
+    ),
+    "10_percentile": OwdEstimatorConfig(
+        window_size=50,
+        max_owd=50_000, #50ms
+        uncertainty_beta=3,
+        strategy=EstimatorStrategy(type="percentile", percentile=0.1),
+    ),
+    "50_percentile": OwdEstimatorConfig(
+        window_size=50,
+        max_owd=50_000, #50ms
+        uncertainty_beta=3,
+        strategy=EstimatorStrategy(type="percentile", percentile=0.5),
+    ),
+    "90_percentile": OwdEstimatorConfig(
+        window_size=50,
+        max_owd=50_000,
+        uncertainty_beta=3,
+        strategy=EstimatorStrategy(type="percentile", percentile=0.9),
+    ),
+}
+
 def clock_quality_benchmark(num_runs: int = 3):
     workload = {node: [RequestInterval(20, 50, 0.5)] for node in [1, 2, 3, 4, 5]}
     flex_quorum = FlexibleQuorum(read_quorum_size=3, write_quorum_size=3)
@@ -94,6 +127,7 @@ def clock_quality_benchmark(num_runs: int = 3):
             cluster.change_server_config(
                 server_id,
                 clock=ClockConfig(node_id=server_id, drift_rate_us_per_sec=0, seed=42, **clock_params),
+                owd_config=OWD_CONFIGS["fixed"],
             )
         for run in range(num_runs):
             iteration_dir = experiment_log_dir / quality / f"run-{run}"
