@@ -74,7 +74,7 @@ CLOCK_CONFIGS = {
 }
 
 FIXED_OWD_CONFIG = OwdEstimatorConfig(
-    window_size=50,
+    window_size=10,
     max_owd=50_000,
     uncertainty_beta=3,
     strategy=EstimatorStrategy(type="fixed", percentile=None),
@@ -82,31 +82,19 @@ FIXED_OWD_CONFIG = OwdEstimatorConfig(
 
 PERCENTILE_OWD_CONFIGS = {
     "p10": OwdEstimatorConfig(
-        window_size=50,
+        window_size=10,
         max_owd=50_000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.1),
     ),
-    "p30": OwdEstimatorConfig(
-        window_size=50,
-        max_owd=50_000,
-        uncertainty_beta=3,
-        strategy=EstimatorStrategy(type="percentile", percentile=0.3),
-    ),
     "p50": OwdEstimatorConfig(
-        window_size=50,
+        window_size=10,
         max_owd=50_000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.5),
     ),
-    "p70": OwdEstimatorConfig(
-        window_size=50,
-        max_owd=50_000,
-        uncertainty_beta=3,
-        strategy=EstimatorStrategy(type="percentile", percentile=0.7),
-    ),
     "p90": OwdEstimatorConfig(
-        window_size=50,
+        window_size=10,
         max_owd=50_000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.9),
@@ -143,7 +131,7 @@ def clock_quality_fixed_owd_benchmark(num_runs: int = 3):
             cluster.change_server_config(
                 server_id,
                 clock=ClockConfig(node_id=server_id, drift_rate_us_per_sec=0, seed=42, **clock_params),
-                owd_config=FIXED_OWD_CONFIG,
+                owd_config=PERCENTILE_OWD_CONFIGS["p50"],
             )
         for run in range(num_runs):
             iteration_dir = experiment_log_dir / quality / f"run-{run}"
