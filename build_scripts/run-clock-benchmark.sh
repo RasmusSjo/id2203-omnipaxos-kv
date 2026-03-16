@@ -51,7 +51,7 @@ read_ratio = 0.5
 TOML
 
     # Write server configs with correct output paths
-    for i in 1 2 3 4 5; do
+    for i in 1 2 3; do
         local src="$SCRIPT_DIR/$quality/server-$i-config.toml"
         local dst="$log_dir/server-$i-config.toml"
         sed "s|output_filepath = .*|output_filepath = \"$log_dir/server-$i.json\"|" "$src" > "$dst"
@@ -59,7 +59,7 @@ TOML
 
     # Start servers
     local server_pids=()
-    for i in 1 2 3 4 5; do
+    for i in 1 2 3; do
         RUST_LOG=$RUST_LOG \
         SERVER_CONFIG_FILE="$log_dir/server-$i-config.toml" \
         CLUSTER_CONFIG_FILE="$CLUSTER_CONFIG" \
