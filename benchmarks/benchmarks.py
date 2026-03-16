@@ -73,26 +73,39 @@ CLOCK_CONFIGS = {
     "low":    dict(sync_uncertainty_us=1000, sync_period_us=100_000),
 }
 
-OWD_CONFIGS = {
-    "fixed": OwdEstimatorConfig(
+FIXED_OWD_CONFIG = OwdEstimatorConfig(
+    window_size=50,
+    max_owd=50_000,
+    uncertainty_beta=3,
+    strategy=EstimatorStrategy(type="fixed", percentile=None),
+)
+
+PERCENTILE_OWD_CONFIGS = {
+    "p10": OwdEstimatorConfig(
         window_size=50,
-        max_owd=50_000, #50ms
-        uncertainty_beta=3,
-        strategy=EstimatorStrategy(type="fixed"),
-    ),
-    "10_percentile": OwdEstimatorConfig(
-        window_size=50,
-        max_owd=50_000, #50ms
+        max_owd=50_000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.1),
     ),
-    "50_percentile": OwdEstimatorConfig(
+    "p30": OwdEstimatorConfig(
         window_size=50,
-        max_owd=50_000, #50ms
+        max_owd=50_000,
+        uncertainty_beta=3,
+        strategy=EstimatorStrategy(type="percentile", percentile=0.3),
+    ),
+    "p50": OwdEstimatorConfig(
+        window_size=50,
+        max_owd=50_000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.5),
     ),
-    "90_percentile": OwdEstimatorConfig(
+    "p70": OwdEstimatorConfig(
+        window_size=50,
+        max_owd=50_000,
+        uncertainty_beta=3,
+        strategy=EstimatorStrategy(type="percentile", percentile=0.7),
+    ),
+    "p90": OwdEstimatorConfig(
         window_size=50,
         max_owd=50_000,
         uncertainty_beta=3,
@@ -100,11 +113,10 @@ OWD_CONFIGS = {
     ),
 }
 
-def clock_quality_benchmark(num_runs: int = 3):
-    workload = {node: [RequestInterval(20, 50, 0.5)] for node in [1, 2, 3, 4, 5]}
-    flex_quorum = FlexibleQuorum(read_quorum_size=3, write_quorum_size=3)
 
-    cluster = (
+def build_clock_benchmark_cluster():
+    workload = {node: [RequestInterval(20, 50, 0.5)] for node in [1, 2, 3, 4, 5]}
+    return (
         OmnipaxosClusterBuilder(2)
         .initial_leader(5)
         .server(1, "us-west2-a")
@@ -119,15 +131,19 @@ def clock_quality_benchmark(num_runs: int = 3):
         .client(5, "europe-west4-a", requests=workload[5])
     ).build()
 
+
+def clock_quality_fixed_owd_benchmark(num_runs: int = 3):
+    flex_quorum = FlexibleQuorum(read_quorum_size=3, write_quorum_size=3)
+    cluster = build_clock_benchmark_cluster()
     cluster.change_cluster_config(initial_flexible_quorum=flex_quorum)
-    experiment_log_dir = Path("./logs/clock-benchmark-gcp")
+    experiment_log_dir = Path("./logs/clock-quality-fixed-owd-gcp")
 
     for quality, clock_params in CLOCK_CONFIGS.items():
         for server_id in [1, 2, 3, 4, 5]:
             cluster.change_server_config(
                 server_id,
                 clock=ClockConfig(node_id=server_id, drift_rate_us_per_sec=0, seed=42, **clock_params),
-                owd_config=OWD_CONFIGS["fixed"],
+                owd_config=FIXED_OWD_CONFIG,
             )
         for run in range(num_runs):
             iteration_dir = experiment_log_dir / quality / f"run-{run}"
@@ -136,8 +152,33 @@ def clock_quality_benchmark(num_runs: int = 3):
 
     cluster.shutdown()
 
+
+def owd_percentile_benchmark(num_runs: int = 3, clock_quality: str = "medium"):
+    flex_quorum = FlexibleQuorum(read_quorum_size=3, write_quorum_size=3)
+    cluster = build_clock_benchmark_cluster()
+    cluster.change_cluster_config(initial_flexible_quorum=flex_quorum)
+
+    clock_params = CLOCK_CONFIGS[clock_quality]
+    experiment_log_dir = Path(f"./logs/owd-percentile-clock-{clock_quality}-gcp")
+
+    for percentile_label, owd_config in PERCENTILE_OWD_CONFIGS.items():
+        for server_id in [1, 2, 3, 4, 5]:
+            cluster.change_server_config(
+                server_id,
+                clock=ClockConfig(node_id=server_id, drift_rate_us_per_sec=0, seed=42, **clock_params),
+                owd_config=owd_config,
+            )
+        for run in range(num_runs):
+            iteration_dir = experiment_log_dir / percentile_label / f"run-{run}"
+            print("RUNNING:", iteration_dir)
+            cluster.run(iteration_dir)
+
+    cluster.shutdown()
+
+
 def main():
-    clock_quality_benchmark()
+    clock_quality_fixed_owd_benchmark()
+    owd_percentile_benchmark()
     #example_benchmark()
 
 
