@@ -75,7 +75,7 @@ CLOCK_CONFIGS = {
 
 FIXED_OWD_CONFIG = OwdEstimatorConfig(
     window_size=10,
-    max_owd=50_000,
+    max_owd=50_0000,
     uncertainty_beta=3,
     strategy=EstimatorStrategy(type="fixed", percentile=None),
 )
@@ -83,19 +83,19 @@ FIXED_OWD_CONFIG = OwdEstimatorConfig(
 PERCENTILE_OWD_CONFIGS = {
     "p10": OwdEstimatorConfig(
         window_size=10,
-        max_owd=50_000,
+        max_owd=50_0000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.1),
     ),
     "p50": OwdEstimatorConfig(
         window_size=10,
-        max_owd=50_000,
+        max_owd=50_0000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.5),
     ),
     "p90": OwdEstimatorConfig(
         window_size=10,
-        max_owd=50_000,
+        max_owd=50_0000,
         uncertainty_beta=3,
         strategy=EstimatorStrategy(type="percentile", percentile=0.9),
     ),
